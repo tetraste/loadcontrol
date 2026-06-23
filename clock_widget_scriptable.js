@@ -137,24 +137,24 @@ function buildLockScreen(w) {
 //   totale contenuto ~101pt → OK
 
 function buildMain(w, large) {
-  const PAD      = large ? 16 : 10
-  const timeSize = large ? 72 : 44
+  const PAD      = large ? 16 : 12
+  const timeSize = large ? 72 : 40
   const bodySize = large ? 13 : 10
-  const barW     = large ? 34 : 24
+  const barW     = large ? 34 : 26
 
   w.setPadding(PAD, PAD, PAD, PAD)
 
   // ── Riga superiore: orologio sx, data+meteo dx ──
   const topRow = w.addStack()
   topRow.layoutHorizontally()
-  topRow.bottomAlignContent()
+  topRow.topAlignContent()   // data ancorata in alto a destra
 
   // Orologio — grande, sottile, bordeaux, sinistra
   txt(topRow, timeStr, Font.thinSystemFont(timeSize), hex(CLR.time))
 
   topRow.addSpacer()
 
-  // Data + meteo — destra
+  // Data + meteo — destra, allineati in alto
   const right = topRow.addStack()
   right.layoutVertically()
 
@@ -162,8 +162,8 @@ function buildMain(w, large) {
 
   if (weather) {
     const [icon, label] = wmoInfo(weather.code)
-    right.addSpacer(large ? 6 : 3)
-    txt(right, `${icon} ${weather.temp}°C`, Font.boldSystemFont(bodySize + 1), hex(CLR.wx), "right")
+    right.addSpacer(large ? 8 : 5)
+    txt(right, `${icon} ${weather.temp}°C`, Font.boldSystemFont(large ? bodySize + 2 : bodySize + 1), hex(CLR.wx), "right")
     right.addSpacer(2)
     txt(right, label, Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
     if (large) {
@@ -172,16 +172,16 @@ function buildMain(w, large) {
         Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
     }
   } else {
-    right.addSpacer(3)
+    right.addSpacer(5)
     txt(right, "Meteo n/d", Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
   }
 
-  w.addSpacer(large ? 12 : 4)
+  w.addSpacer(large ? 14 : 8)
 
   // ── % giornata ──
   addBarRow(w, "☀", "Giorno", dayPct, CLR.day, bodySize, barW)
 
-  w.addSpacer(large ? 10 : 3)
+  w.addSpacer(large ? 10 : 5)
 
   // ── Batteria ──
   addBarRow(w, charging ? "⚡" : "🔋", "Batteria", battPct, CLR.batt, bodySize, barW)
