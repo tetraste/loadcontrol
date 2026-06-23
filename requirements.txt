@@ -1,1 +1,3 @@
 aioesphomeapi>=13.0
+rich>=13.0
+psutil>=5.9
