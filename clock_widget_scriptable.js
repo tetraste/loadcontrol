@@ -1,17 +1,54 @@
 // Variables used by Scriptable.
-// icon-color: blue; icon-glyph: clock;
+// icon-color: red; icon-glyph: clock;
 //
-// Clock Widget — orologio, % giornata, batteria
+// Clock Widget v2 — orologio bordeaux, % giornata, batteria, meteo
 // Dimensioni: Medium (default), Large, Lock Screen Rectangular
 //
-// Installazione:
-//   1. Copia questo file in Scriptable (app o iCloud/Scriptable/)
-//   2. Esegui nell'app per vedere l'anteprima
-//   3. Aggiungi widget Scriptable alla home → scegli questo script
+// Prima esecuzione: concedi i permessi Posizione quando richiesto
 
-const REFRESH_S = 30
+// ── WMO weather codes ────────────────────────────────────────────────
 
-// ── Dati ────────────────────────────────────────────────────────────
+function wmoInfo(code) {
+  if (code === 0)  return ["☀️", "Sereno"]
+  if (code === 1)  return ["🌤️", "Poco nuvoloso"]
+  if (code === 2)  return ["⛅", "Parz. nuvoloso"]
+  if (code === 3)  return ["☁️", "Nuvoloso"]
+  if (code <= 48)  return ["🌫️", "Nebbia"]
+  if (code <= 55)  return ["🌦️", "Pioggerella"]
+  if (code <= 65)  return ["🌧️", "Pioggia"]
+  if (code <= 77)  return ["❄️", "Neve"]
+  if (code <= 82)  return ["🌧️", "Rovesci"]
+  if (code <= 86)  return ["🌨️", "Neve a rovesci"]
+  return ["⛈️", "Temporale"]
+}
+
+// ── Meteo via Open-Meteo (gratuito, no API key) ──────────────────────
+
+async function fetchWeather() {
+  try {
+    const loc  = await Location.current()
+    const lat  = loc.latitude.toFixed(4)
+    const lon  = loc.longitude.toFixed(4)
+    const url  = `https://api.open-meteo.com/v1/forecast`
+              + `?latitude=${lat}&longitude=${lon}`
+              + `&current=temperature_2m,weather_code`
+              + `&daily=temperature_2m_max,temperature_2m_min`
+              + `&timezone=auto&forecast_days=1`
+    const data = await new Request(url).loadJSON()
+    return {
+      temp:    Math.round(data.current.temperature_2m),
+      code:    data.current.weather_code,
+      maxTemp: Math.round(data.daily.temperature_2m_max[0]),
+      minTemp: Math.round(data.daily.temperature_2m_min[0]),
+    }
+  } catch (_) {
+    return null
+  }
+}
+
+// ── Dati ─────────────────────────────────────────────────────────────
+
+const weather  = await fetchWeather()
 
 const now      = new Date()
 const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -20,38 +57,39 @@ const battPct  = Device.batteryLevel() * 100
 const charging = Device.isCharging()
 
 const timeStr = now.toLocaleTimeString("it-IT", {
-  hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  hour: "2-digit", minute: "2-digit", hour12: false,
 })
 const dateStr = now.toLocaleDateString("it-IT", {
-  weekday: "long", day: "numeric", month: "long",
+  weekday: "short", day: "numeric", month: "short",
 }).replace(/^\w/, c => c.toUpperCase())
 
-// ── Colori ──────────────────────────────────────────────────────────
+// ── Colori ───────────────────────────────────────────────────────────
 
-const BATT_CLR = charging   ? "#4ade80"
-               : battPct > 50 ? "#4ade80"
-               : battPct > 20 ? "#facc15"
+const BATT_CLR = (charging || battPct > 50) ? "#4ade80"
+               : battPct > 20               ? "#facc15"
                : "#f87171"
 
 const CLR = {
   bg1:  "#0d0d1a",
-  bg2:  "#091525",
-  time: "#38bdf8",
+  bg2:  "#0c111d",
+  time: "#b5273f",   // bordeaux
   date: "#94a3b8",
   day:  "#facc15",
   batt: BATT_CLR,
+  wx:   "#e2e8f0",
+  dim:  "#64748b",
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────
 
 const hex = h => new Color(h)
 
-function bar(pct, width) {
-  const n = Math.round(Math.min(100, Math.max(0, pct)) / 100 * width)
-  return "█".repeat(n) + "░".repeat(width - n)
+function bar(pct, w) {
+  const n = Math.round(Math.min(100, Math.max(0, pct)) / 100 * w)
+  return "█".repeat(n) + "░".repeat(w - n)
 }
 
-function addText(parent, str, font, color, align) {
+function txt(parent, str, font, color, align) {
   const t = parent.addText(str)
   t.font      = font
   t.textColor = color instanceof Color ? color : hex(color)
@@ -60,72 +98,95 @@ function addText(parent, str, font, color, align) {
   return t
 }
 
-function addRow(container, icon, label, pct, color, size) {
-  const row = container.addStack()
+function addBarRow(w, icon, label, pct, color, size, barW) {
+  const row = w.addStack()
   row.layoutHorizontally()
   row.centerAlignContent()
-  addText(row, `${icon}  ${label}`, Font.boldSystemFont(size), hex(color))
+  txt(row, `${icon}  ${label}`, Font.boldSystemFont(size), hex(color))
   row.addSpacer()
-  addText(row, `${pct.toFixed(1)}%`, Font.boldMonospacedSystemFont(size), hex(color))
+  txt(row, `${pct.toFixed(1)}%`, Font.boldMonospacedSystemFont(size), hex(color))
+  w.addSpacer(3)
+  txt(w, bar(pct, barW), Font.regularMonospacedSystemFont(size), hex(color), "center")
 }
 
-// ── Schermata di blocco (Rectangular) ───────────────────────────────
+// ── Lock Screen (Rectangular) ─────────────────────────────────────────
 
 function buildLockScreen(w) {
   w.setPadding(2, 4, 2, 4)
-  addText(w, timeStr, Font.boldMonospacedSystemFont(20), Color.white())
+  txt(w, timeStr, Font.thinSystemFont(22), hex(CLR.time))
   w.addSpacer(2)
-  addText(w, `☀  Giorno  ${dayPct.toFixed(1)}%`, Font.boldSystemFont(10), hex(CLR.day))
-  addText(w, bar(dayPct, 22), Font.regularMonospacedSystemFont(8), hex(CLR.day))
+  if (weather) {
+    const [icon] = wmoInfo(weather.code)
+    txt(w, `${icon} ${weather.temp}°  ↑${weather.maxTemp}° ↓${weather.minTemp}°`,
+      Font.systemFont(10), hex(CLR.wx))
+  }
   w.addSpacer(2)
-  addText(w, `${charging ? "⚡" : "🔋"}  Batteria  ${battPct.toFixed(0)}%`,
-    Font.boldSystemFont(10), hex(CLR.batt))
-  addText(w, bar(battPct, 22), Font.regularMonospacedSystemFont(8), hex(CLR.batt))
+  txt(w, `☀ ${dayPct.toFixed(1)}%  ${bar(dayPct, 14)}`,
+    Font.regularMonospacedSystemFont(9), hex(CLR.day))
 }
 
-// ── Widget principale (Medium / Large) ──────────────────────────────
+// ── Widget principale (Medium / Large) ────────────────────────────────
 
 function buildMain(w, large) {
-  const PAD      = large ? 16 : 14
-  const timeSize = large ? 52 : 38
+  const PAD      = large ? 16 : 12
+  const timeSize = large ? 76 : 58
   const bodySize = large ? 13 : 11
-  const barWidth = large ? 34 : 26
+  const barW     = large ? 34 : 26
 
   w.setPadding(PAD, PAD, PAD, PAD)
 
-  // ── Orologio ──
-  w.addSpacer(large ? 8 : 2)
-  addText(w, timeStr, Font.boldMonospacedSystemFont(timeSize), hex(CLR.time), "center")
+  // ── Riga superiore: orologio sx, data+meteo dx ──
+  const topRow = w.addStack()
+  topRow.layoutHorizontally()
+  topRow.bottomAlignContent()
 
-  // ── Data ──
-  w.addSpacer(4)
-  addText(w, dateStr, Font.systemFont(bodySize - 1), hex(CLR.date), "center")
+  // Orologio — grande, sottile, bordeaux, sinistra
+  txt(topRow, timeStr, Font.thinSystemFont(timeSize), hex(CLR.time))
 
-  w.addSpacer(large ? 16 : 8)
+  topRow.addSpacer()
+
+  // Data + meteo — destra
+  const right = topRow.addStack()
+  right.layoutVertically()
+  right.bottomAlignContent()
+
+  txt(right, dateStr, Font.systemFont(bodySize - 1), hex(CLR.date), "right")
+
+  if (weather) {
+    const [icon, label] = wmoInfo(weather.code)
+    right.addSpacer(large ? 6 : 4)
+    txt(right, `${icon} ${weather.temp}°C`, Font.boldSystemFont(bodySize + 2), hex(CLR.wx), "right")
+    right.addSpacer(2)
+    txt(right, label, Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
+    right.addSpacer(2)
+    txt(right, `↑${weather.maxTemp}°  ↓${weather.minTemp}°`,
+      Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
+  } else {
+    right.addSpacer(4)
+    txt(right, "Meteo n/d", Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
+  }
+
+  w.addSpacer(large ? 14 : 7)
 
   // ── % giornata ──
-  addRow(w, "☀", "Giorno", dayPct, CLR.day, bodySize)
-  w.addSpacer(3)
-  addText(w, bar(dayPct, barWidth), Font.regularMonospacedSystemFont(bodySize), hex(CLR.day), "center")
+  addBarRow(w, "☀", "Giorno", dayPct, CLR.day, bodySize, barW)
 
-  w.addSpacer(large ? 12 : 6)
+  w.addSpacer(large ? 10 : 5)
 
   // ── Batteria ──
-  addRow(w, charging ? "⚡" : "🔋", "Batteria", battPct, CLR.batt, bodySize)
-  w.addSpacer(3)
-  addText(w, bar(battPct, barWidth), Font.regularMonospacedSystemFont(bodySize), hex(CLR.batt), "center")
+  addBarRow(w, charging ? "⚡" : "🔋", "Batteria", battPct, CLR.batt, bodySize, barW)
 
   w.addSpacer(large ? 8 : 2)
 }
 
-// ── Costruisci il widget ─────────────────────────────────────────────
+// ── Costruzione widget ────────────────────────────────────────────────
 
 const widget = new ListWidget()
-widget.refreshAfterDate = new Date(Date.now() + REFRESH_S * 1000)
+widget.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000)
 
 const grad = new LinearGradient()
-grad.colors    = [hex(CLR.bg1), hex(CLR.bg2)]
-grad.locations = [0, 1]
+grad.colors     = [hex(CLR.bg1), hex(CLR.bg2)]
+grad.locations  = [0, 1]
 grad.startPoint = new Point(0, 0)
 grad.endPoint   = new Point(0, 1)
 widget.backgroundGradient = grad
