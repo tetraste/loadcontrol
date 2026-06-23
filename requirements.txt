@@ -1,0 +1,1 @@
+aioesphomeapi>=13.0

@@ -1,0 +1,49 @@
+# Snippet ESPHome — controllo luminosità display Daikin Madoka (BRC1H)
+#
+# Aggiungere questa configurazione al file ESPHome esistente dell'ESP32
+# che già gestisce il Madoka zona notte.
+#
+# IMPORTANTE: non sostituire il blocco climate esistente, ma aggiungere
+# solo la riga `eye_brightness:` all'interno del componente Madoka già presente.
+#
+# Il componente richiede il fork con supporto eye_brightness:
+#   https://github.com/dasimon135/daikin_madoka  (branch: madoka)
+#
+# Nella sezione `esphome:` del file YAML esistente, verificare che sia presente:
+#
+#   external_components:
+#     - source: github://dasimon135/daikin_madoka@madoka
+#       components: [daikin_madoka]
+#
+# -----------------------------------------------------------------------
+
+# Esempio di configurazione completa del componente Madoka zona notte.
+# Modificare i valori di ble_client_id e name in base alla configurazione
+# già presente nel file ESPHome sul dispositivo.
+
+ble_client:
+  - mac_address: "AA:BB:CC:DD:EE:FF"   # <- MAC address del Madoka zona notte
+    id: madoka_notte
+
+climate:
+  - platform: daikin_madoka
+    name: "Zona Notte"
+    ble_client_id: madoka_notte
+    update_interval: 15s
+    eye_brightness:
+      name: "Madoka Notte - Display"   # <- questo è il nome dell'entità Number
+                                        #    che madoka_display.py rileverà
+
+# -----------------------------------------------------------------------
+# Dopo aver aggiunto eye_brightness: e riflashato l'ESP32, testare con:
+#
+#   pip install aioesphomeapi>=13.0
+#   python madoka_display.py <IP_ESP32> --get
+#   python madoka_display.py <IP_ESP32> --off
+#
+# Gamma valori eye_brightness: 0 (spento) … 19 (massima luminosità)
+#
+# Nota: "eye_brightness" controlla il LED indicatore blu (eye) del Madoka,
+# non il display LCD principale. Il LCD si spegne autonomamente dopo un
+# periodo di inattività e non è controllabile via BLE.
+# -----------------------------------------------------------------------
