@@ -126,12 +126,21 @@ function buildLockScreen(w) {
 }
 
 // ── Widget principale (Medium / Large) ────────────────────────────────
+//
+// Budget altezza medium: ~155pt totali
+//   padding 10+10 = 20pt
+//   clock 44pt → ~50pt reali
+//   spacer 4pt
+//   riga giornata (10+2+10) = 22pt
+//   spacer 3pt
+//   riga batteria (10+2+10) = 22pt
+//   totale contenuto ~101pt → OK
 
 function buildMain(w, large) {
-  const PAD      = large ? 16 : 12
-  const timeSize = large ? 76 : 58
-  const bodySize = large ? 13 : 11
-  const barW     = large ? 34 : 26
+  const PAD      = large ? 16 : 10
+  const timeSize = large ? 72 : 44
+  const bodySize = large ? 13 : 10
+  const barW     = large ? 34 : 24
 
   w.setPadding(PAD, PAD, PAD, PAD)
 
@@ -148,35 +157,36 @@ function buildMain(w, large) {
   // Data + meteo — destra
   const right = topRow.addStack()
   right.layoutVertically()
-  right.bottomAlignContent()
 
   txt(right, dateStr, Font.systemFont(bodySize - 1), hex(CLR.date), "right")
 
   if (weather) {
     const [icon, label] = wmoInfo(weather.code)
-    right.addSpacer(large ? 6 : 4)
-    txt(right, `${icon} ${weather.temp}°C`, Font.boldSystemFont(bodySize + 2), hex(CLR.wx), "right")
+    right.addSpacer(large ? 6 : 3)
+    txt(right, `${icon} ${weather.temp}°C`, Font.boldSystemFont(bodySize + 1), hex(CLR.wx), "right")
     right.addSpacer(2)
     txt(right, label, Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
-    right.addSpacer(2)
-    txt(right, `↑${weather.maxTemp}°  ↓${weather.minTemp}°`,
-      Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
+    if (large) {
+      right.addSpacer(2)
+      txt(right, `↑${weather.maxTemp}°  ↓${weather.minTemp}°`,
+        Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
+    }
   } else {
-    right.addSpacer(4)
+    right.addSpacer(3)
     txt(right, "Meteo n/d", Font.systemFont(bodySize - 1), hex(CLR.dim), "right")
   }
 
-  w.addSpacer(large ? 14 : 7)
+  w.addSpacer(large ? 12 : 4)
 
   // ── % giornata ──
   addBarRow(w, "☀", "Giorno", dayPct, CLR.day, bodySize, barW)
 
-  w.addSpacer(large ? 10 : 5)
+  w.addSpacer(large ? 10 : 3)
 
   // ── Batteria ──
   addBarRow(w, charging ? "⚡" : "🔋", "Batteria", battPct, CLR.batt, bodySize, barW)
 
-  w.addSpacer(large ? 8 : 2)
+  w.addSpacer(large ? 8 : 0)
 }
 
 // ── Costruzione widget ────────────────────────────────────────────────
